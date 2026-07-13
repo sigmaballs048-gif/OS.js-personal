@@ -13,13 +13,13 @@ import config from './config.js';
 const init = async () => {
   let packageManifest = [];
 
-  // 1. Pre-load your packages definition from the static file
+  // 1. Load the package metadata cleanly from the static file
   try {
     const response = await fetch('/metadata.json');
     const data = await response.json();
     packageManifest = Array.isArray(data) ? data : Object.values(data);
     
-    // Inject the structural desktop layout definition directly into our array
+    // Smoothly insert the structural desktop panel block if it is missing
     if (!packageManifest.some(pkg => pkg.name === '@osjs/panels')) {
       console.log('Injecting missing @osjs/panels to local array definition...');
       packageManifest.push({
@@ -35,36 +35,19 @@ const init = async () => {
     console.error('Error parsing metadata.json:', error);
   }
 
-  // 2. Setup the Core with deep configuration overrides
+  // 2. Initialize Core with a completely safe configuration footprint
   const osjs = new Core({
     ...config,
-    standalone: false,
-    
-    // Provide the manifest directly so OS.js treats it as a pre-loaded local registry
-    packages: {
-      ...(config.packages || {}),
-      manifest: packageManifest,
-      entries: packageManifest,
-      discover: () => Promise.resolve(packageManifest)
-    }
+    standalone: true // Keeps network lookup workflows strictly local/offline
   }, {});
 
-  // 3. STUB WEBSOCKETS TO PREVENT THE 1006 CRASH
-  // This completely stops the engine from attempting to create a 'wss://' link
-  osjs.instance.bind('osjs/websocket', () => ({
-    on: () => {},
-    emit: () => {},
-    create: () => ({ on: () => {}, emit: () => {}, close: () => {} }),
-    wrapper: { cookies: () => Promise.resolve({}) }
-  }));
-
-  // Direct configuration states strictly to local browser memory
+  // Direct configuration states strictly to local browser storage
   osjs.register(SettingsServiceProvider, {
     before: true,
     args: { adapter: 'localStorage' }
   });
   
-  // Register basic core providers
+  // Register standard core providers normally
   osjs.register(CoreServiceProvider);
   osjs.register(DesktopServiceProvider);
   
@@ -75,20 +58,23 @@ const init = async () => {
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // 4. OVERRIDE NETWORK INJECTOR
-  // Force the package service layer to yield our combined array every time
+  // 3. SAFE PACKAGE CONTEXT HYDRATION
+  // We hook into the boot cycle to supply our data array without breaking config internals
   const originalBoot = osjs.boot.bind(osjs);
   osjs.boot = async function() {
     if (osjs.has('osjs/packages')) {
       const packageService = osjs.make('osjs/packages');
+      
+      // Seed the internal registries completely
       packageService.packages = packageManifest;
       packageService.getPackages = () => [...packageManifest];
       packageService.getPackage = (name) => packageManifest.find(p => p.name === name);
+      packageService.getCompatiblePackages = () => [...packageManifest];
     }
     return originalBoot();
   };
 
-  // Launch the desktop workspace environment
+  // Launch your workspace interface
   osjs.boot()
     .then(() => {
       console.log('OS.js connected and stabilized. Booting panels...');
