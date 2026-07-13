@@ -39,6 +39,7 @@
 //
 
 // src/client/index.js
+// src/client/index.js
 
 import { Core } from '@osjs/client';
 import { CoreServiceProvider } from '@osjs/client';
@@ -46,18 +47,20 @@ import githubAdapter from './github-vfs.js';
 
 const init = () => {
   const osjs = new Core({
-    standalone: true // Forces OS.js to run purely in the browser without a Node server
+    standalone: true
   });
 
   // Register Core services
-  osjs.register(CoreServiceProvider);
-
-  // Register the custom GitHub filesystem drive
-  osjs.register('osjs/vfs', (core) => ({
-    adapters: {
-      github: githubAdapter(core)
+  osjs.register(CoreServiceProvider, {
+    before: (core) => {
+      // Register our filesystem adapter inside the core registry
+      core.register('osjs/fs', (fs) => ({
+        adapters: {
+          github: githubAdapter(core)
+        }
+      }));
     }
-  }), { instantiate: true });
+  });
 
   // Boot up the desktop environment
   osjs.boot();
