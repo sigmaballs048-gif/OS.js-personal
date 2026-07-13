@@ -56,17 +56,29 @@ import githubAdapter from './github-vfs.js';
 
 const init = () => {
   const osjs = new Core({
-    standalone: true
+    standalone: true,
+    // Provide explicit metadata configurations to completely bypass standalone network fetch errors
+    packages: {
+      metadata: [
+        {
+          name: 'StandardTheme',
+          type: 'theme',
+          category: 'system',
+          title: { en_EN: 'Standard Theme' },
+          description: { en_EN: 'Standard Theme' }
+        }
+      ]
+    }
   });
 
-  // 1. Register settings configuration before core launches
+  // 1. Register configurations before UI rendering starts
   osjs.register(SettingsServiceProvider, { before: true });
   
-  // 2. Register core UI layer frameworks
+  // 2. Load core UI layer engines
   osjs.register(CoreServiceProvider);
   osjs.register(DesktopServiceProvider);
   
-  // 3. Register Virtual File System and cleanly bind the github adapter
+  // 3. Register filesystem and attach your customized github storage module
   osjs.register(VFSServiceProvider, {
     args: {
       adapters: {
@@ -75,11 +87,11 @@ const init = () => {
     }
   });
 
-  // 4. Register supporting background handlers
+  // 4. Load background communication services
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // 5. Fire up the layout engine
+  // 5. Fire up the desktop interface
   osjs.boot();
 };
 
