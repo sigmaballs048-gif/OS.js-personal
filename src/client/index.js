@@ -38,36 +38,28 @@
 // https://manual.os-js.org/resource/official/
 //
 
-import {
-  Core,
-  CoreServiceProvider,
-  DesktopServiceProvider,
-  VFSServiceProvider,
-  NotificationServiceProvider,
-  SettingsServiceProvider,
-  AuthServiceProvider
-} from '@osjs/client';
+// src/client/index.js
 
-import {PanelServiceProvider} from '@osjs/panels';
-import {GUIServiceProvider} from '@osjs/gui';
-import {DialogServiceProvider} from '@osjs/dialogs';
-import config from './config.js';
-import './index.scss';
+import { Core } from '@os-js/client';
+import { CoreServiceProvider } from '@os-js/client';
+import githubAdapter from './github-vfs.js';
 
 const init = () => {
-  const osjs = new Core(config, {});
+  const osjs = new Core({
+    standalone: true // Forces OS.js to run purely in the browser without a Node server
+  });
 
-  // Register your service providers
+  // Register Core services
   osjs.register(CoreServiceProvider);
-  osjs.register(DesktopServiceProvider);
-  osjs.register(VFSServiceProvider);
-  osjs.register(NotificationServiceProvider);
-  osjs.register(SettingsServiceProvider, {before: true});
-  osjs.register(AuthServiceProvider, {before: true});
-  osjs.register(PanelServiceProvider);
-  osjs.register(DialogServiceProvider);
-  osjs.register(GUIServiceProvider);
 
+  // Register the custom GitHub filesystem drive
+  osjs.register('osjs/vfs', (core) => ({
+    adapters: {
+      github: githubAdapter(core)
+    }
+  }), { instantiate: true });
+
+  // Boot up the desktop environment
   osjs.boot();
 };
 
