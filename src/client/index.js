@@ -18,9 +18,23 @@ const init = async () => {
     const response = await fetch('metadata.json');
     const data = await response.json();
     
-    // OS.js package service expects an array of metadata objects.
-    // If your build output targets a dictionary mapping, convert it here.
+    // Convert dictionary mapping to flat array if necessary
     packageManifest = Array.isArray(data) ? data : Object.values(data);
+
+    // CRITICAL FIX: Explicitly check and inject the structural panel metadata if it's missing
+    const hasPanels = packageManifest.some(pkg => pkg.name === '@osjs/panels');
+    if (!hasPanels) {
+      console.log('Injecting missing @osjs/panels metadata into local memory...');
+      packageManifest.push({
+        name: '@osjs/panels',
+        type: 'application',
+        singleton: true,
+        title: { en_EN: 'Panels' },
+        description: { en_EN: 'OS.js Desktop Panels' },
+        files: ['main.js', 'main.css'] // Standard entry points for the package loader
+      });
+    }
+
     console.log(`Loaded metadata containing ${packageManifest.length} entries.`);
   } catch (error) {
     console.error('Failed to pre-load system manifest metadata:', error);
@@ -28,14 +42,12 @@ const init = async () => {
 
   const osjs = new Core({
     ...config,
-    standalone: true, // Blocks external request chains
+    standalone: true, // Prevents any internal backend requests
     
-    // Explicitly configure the core package system to use the local list natively
+    // Provide entries array straight to the Core service configuration
     packages: {
       ...(config.packages || {}),
-      manifest: packageManifest,
-      registry: packageManifest, // Duplicate target to satisfy internal package registry fallbacks
-      discover: () => Promise.resolve(packageManifest) // Overrides background discovery checks
+      entries: packageManifest
     },
 
     desktop: {
@@ -50,13 +62,13 @@ const init = async () => {
     }
   }, {});
 
-  // Force local storage environments to disable user backend syncs
+  // Direct state to localStorage
   osjs.register(SettingsServiceProvider, {
     before: true,
     args: { adapter: 'localStorage' }
   });
   
-  // Register necessary systems
+  // Register engine requirements
   osjs.register(CoreServiceProvider);
   osjs.register(DesktopServiceProvider);
   
@@ -67,10 +79,10 @@ const init = async () => {
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // Boot OS.js and explicitly invoke the layout panel
+  // Boot up the framework interface
   osjs.boot()
     .then(() => {
-      console.log('OS.js Native Boot Complete. Launching panels...');
+      console.log('OS.js Native Boot Complete. Launching workspace panels...');
       return osjs.run('@osjs/panels');
     })
     .catch((err) => console.error('Desktop initialization failed:', err));
