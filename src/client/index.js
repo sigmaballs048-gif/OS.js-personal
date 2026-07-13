@@ -60,21 +60,6 @@ const init = () => {
   const osjs = new Core({
     ...config,
     standalone: true,
-    
-    // Completely stub the package registry methods to guarantee no HTTP hits
-    packages: {
-      metadata,
-      registry: {
-        launch: (name) => Promise.resolve(true),
-        preload: (pkg) => Promise.resolve([]),
-        get: () => [],
-        entries: () => []
-      },
-      // Short-circuit the user package discovery layer
-      discover: () => Promise.resolve([]),
-      configure: () => ({})
-    },
-
     desktop: {
       ...(config.desktop || {}),
       settings: {
@@ -87,14 +72,39 @@ const init = () => {
     }
   }, {});
 
-  // Force local environment settings to prevent server sync actions
+  // Force local environment storage settings
   osjs.register(SettingsServiceProvider, {
     before: true,
     args: { adapter: 'localStorage' }
   });
   
-  // Register necessary desktop components
+  // Register core system services
   osjs.register(CoreServiceProvider);
+  
+  // INTERCEPT & PATCH THE PACKAGE REGISTRY
+  // This completely silences the standalone network error and populates the registry safely
+  const packageService = osjs.make('osjs/packages');
+  if (packageService) {
+    packageService.init = async function() {
+      console.log('System Standalone Mode: Injecting local metadata registry...');
+      
+      const packagesArray = Array.isArray(metadata) 
+        ? metadata 
+        : Object.values(metadata || {});
+
+      packagesArray.forEach(pkg => {
+        try {
+          this.register(pkg);
+        } catch (e) {
+          console.warn('Skipping package registration error:', pkg?.name, e);
+        }
+      });
+      
+      return true;
+    };
+  }
+
+  // Register remaining application and layout services
   osjs.register(DesktopServiceProvider);
   
   osjs.register(VFSServiceProvider, {
@@ -104,11 +114,10 @@ const init = () => {
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // Boot up the client layout
+  // Boot up the environment and execute the desktop layout safely
   osjs.boot()
     .then(() => {
-      console.log('Core booted. Launching workspace panels...');
-      // Manually initiate panels
+      console.log('System successfully booted. Triggering panels...');
       return osjs.run('@osjs/panels');
     })
     .catch((err) => console.error('System failed to initialize desktop:', err));
