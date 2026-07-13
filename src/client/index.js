@@ -13,14 +13,15 @@ import config from './config.js';
 const init = async () => {
   let packageManifest = [];
 
-  // 1. Pre-fetch package configuration array structures
+  // 1. Pre-load your packages definition from the static file
   try {
-    const response = await fetch('metadata.json');
+    const response = await fetch('/metadata.json');
     const data = await response.json();
     packageManifest = Array.isArray(data) ? data : Object.values(data);
     
-    // Inject structural panels fallback schema cleanly
+    // Inject the structural desktop layout definition directly into our array
     if (!packageManifest.some(pkg => pkg.name === '@osjs/panels')) {
+      console.log('Injecting missing @osjs/panels to local array definition...');
       packageManifest.push({
         name: '@osjs/panels',
         type: 'application',
@@ -31,22 +32,39 @@ const init = async () => {
       });
     }
   } catch (error) {
-    console.error('Failed processing metadata map:', error);
+    console.error('Error parsing metadata.json:', error);
   }
 
+  // 2. Setup the Core with deep configuration overrides
   const osjs = new Core({
     ...config,
-    standalone: false, // Maintain standard framework registry behaviors
-    ws: { connect: false } // Blocks WebSocket execution workflows completely
+    standalone: false,
+    
+    // Provide the manifest directly so OS.js treats it as a pre-loaded local registry
+    packages: {
+      ...(config.packages || {}),
+      manifest: packageManifest,
+      entries: packageManifest,
+      discover: () => Promise.resolve(packageManifest)
+    }
   }, {});
 
-  // Force local state retention
+  // 3. STUB WEBSOCKETS TO PREVENT THE 1006 CRASH
+  // This completely stops the engine from attempting to create a 'wss://' link
+  osjs.instance.bind('osjs/websocket', () => ({
+    on: () => {},
+    emit: () => {},
+    create: () => ({ on: () => {}, emit: () => {}, close: () => {} }),
+    wrapper: { cookies: () => Promise.resolve({}) }
+  }));
+
+  // Direct configuration states strictly to local browser memory
   osjs.register(SettingsServiceProvider, {
     before: true,
     args: { adapter: 'localStorage' }
   });
   
-  // Register basic core dependencies
+  // Register basic core providers
   osjs.register(CoreServiceProvider);
   osjs.register(DesktopServiceProvider);
   
@@ -57,23 +75,8 @@ const init = async () => {
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // 2. HTTP NETWORKING INTERCEPTION
-  // We re-bind the base HTTP handler immediately before booting. Whenever OS.js
-  // attempts to query any backend API URL, it gets directed straight to our manifest array.
-  osjs.instance.bind('osjs/http', () => {
-    return {
-      request: (options) => {
-        console.log(`Intercepted core HTTP operation targeting: ${options.url}`);
-        return Promise.resolve(packageManifest);
-      },
-      // Keep basic asset mappings pointing to local directories
-      url: (url) => url,
-      createUrl: (url) => url
-    };
-  });
-
-  // 3. PACKAGE REPOSITORY CONTEXT HYDRATION
-  // Force internal registry targets to reflect the custom manifest array natively
+  // 4. OVERRIDE NETWORK INJECTOR
+  // Force the package service layer to yield our combined array every time
   const originalBoot = osjs.boot.bind(osjs);
   osjs.boot = async function() {
     if (osjs.has('osjs/packages')) {
@@ -81,15 +84,14 @@ const init = async () => {
       packageService.packages = packageManifest;
       packageService.getPackages = () => [...packageManifest];
       packageService.getPackage = (name) => packageManifest.find(p => p.name === name);
-      packageService.getCompatiblePackages = () => [...packageManifest];
     }
     return originalBoot();
   };
 
-  // Launch frontend desktop environments
+  // Launch the desktop workspace environment
   osjs.boot()
     .then(() => {
-      console.log('OS.js Connected successfully to decoupled environment pipeline.');
+      console.log('OS.js connected and stabilized. Booting panels...');
       return osjs.run('@osjs/panels');
     })
     .catch((err) => console.error('Desktop initialization failed:', err));
