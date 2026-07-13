@@ -10,65 +10,25 @@ import {
 import githubAdapter from './github-vfs.js';
 import config from './config.js';
 
-const init = async () => {
-  let packageManifest = [];
-
-  try {
-    console.log('Fetching system metadata manually...');
-    const response = await fetch('metadata.json');
-    const data = await response.json();
-    
-    // Convert dictionary mapping to flat array if necessary
-    packageManifest = Array.isArray(data) ? data : Object.values(data);
-
-    // CRITICAL FIX: Explicitly check and inject the structural panel metadata if it's missing
-    const hasPanels = packageManifest.some(pkg => pkg.name === '@osjs/panels');
-    if (!hasPanels) {
-      console.log('Injecting missing @osjs/panels metadata into local memory...');
-      packageManifest.push({
-        name: '@osjs/panels',
-        type: 'application',
-        singleton: true,
-        title: { en_EN: 'Panels' },
-        description: { en_EN: 'OS.js Desktop Panels' },
-        files: ['main.js', 'main.css'] // Standard entry points for the package loader
-      });
-    }
-
-    console.log(`Loaded metadata containing ${packageManifest.length} entries.`);
-  } catch (error) {
-    console.error('Failed to pre-load system manifest metadata:', error);
-  }
-
+const init = () => {
   const osjs = new Core({
     ...config,
-    standalone: true, // Prevents any internal backend requests
+    standalone: false, // Turn standalone mode OFF so it uses your serverless backend!
     
-    // Provide entries array straight to the Core service configuration
-    packages: {
-      ...(config.packages || {}),
-      entries: packageManifest
-    },
-
-    desktop: {
-      ...(config.desktop || {}),
-      settings: {
-        ...(config.desktop?.settings || {}),
-        background: {
-          type: 'image',
-          src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920'
-        }
-      }
+    // Tell the system where your API roots are relative to your deployment domain
+    http: {
+      ...(config.http || {}),
+      base: '/api'
     }
   }, {});
 
-  // Direct state to localStorage
+  // Force local storage environments for user desktop states
   osjs.register(SettingsServiceProvider, {
     before: true,
     args: { adapter: 'localStorage' }
   });
   
-  // Register engine requirements
+  // Register basic core providers normally
   osjs.register(CoreServiceProvider);
   osjs.register(DesktopServiceProvider);
   
@@ -79,10 +39,10 @@ const init = async () => {
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // Boot up the framework interface
+  // Boot standard engine pipelines
   osjs.boot()
     .then(() => {
-      console.log('OS.js Native Boot Complete. Launching workspace panels...');
+      console.log('OS.js connected to serverless API backend. Booting UI...');
       return osjs.run('@osjs/panels');
     })
     .catch((err) => console.error('Desktop initialization failed:', err));

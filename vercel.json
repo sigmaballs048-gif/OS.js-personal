@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "cleanUrls": true,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/packages", "destination": "/api/index.js" },
+    { "source": "/api/extensions", "destination": "/api/index.js" }
   ]
 }
