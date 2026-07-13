@@ -53,39 +53,22 @@ import {
   AuthServiceProvider
 } from '@osjs/client';
 import githubAdapter from './github-vfs.js';
-import config from './config.js'; // Crucial: Imports the default OS.js core settings
+import config from './config.js';
+
+// Dynamically import the full compiled manifest generated during the build process
+import metadata from '../../dist/metadata.json';
 
 const init = () => {
-  // Safely merge the default configuration with our standalone overrides
   const osjs = new Core({
     ...config,
     standalone: true,
     
-    // Explicitly seed the metadata definitions to prevent outbound HTTP requests
+    // Inject the entire structural manifest to completely eliminate discovery requests
     packages: {
-      metadata: [
-        {
-          name: 'StandardTheme',
-          type: 'theme',
-          category: 'system',
-          title: { en_EN: 'Standard Theme' }
-        },
-        {
-          name: 'GnomeIcons',
-          type: 'icons',
-          category: 'system',
-          title: { en_EN: 'Gnome Icons' }
-        },
-        {
-          name: 'FreedesktopSounds',
-          type: 'sounds',
-          category: 'system',
-          title: { en_EN: 'Freedesktop Sounds' }
-        }
-      ]
+      metadata
     },
 
-    // Point the desktop background directly to an external URL to bypass the 404
+    // Configure a reliable external fallback image for the desktop background
     desktop: {
       ...(config.desktop || {}),
       settings: {
@@ -98,14 +81,17 @@ const init = () => {
     }
   }, {});
 
-  // Register settings layer
-  osjs.register(SettingsServiceProvider, { before: true });
+  // Force the settings provider into localStorage mode to stop background server syncs
+  osjs.register(SettingsServiceProvider, {
+    before: true,
+    args: { adapter: 'localStorage' }
+  });
   
-  // Register basic UI layer services
+  // Register core UI layer services
   osjs.register(CoreServiceProvider);
   osjs.register(DesktopServiceProvider);
   
-  // Register file management and inject the custom GitHub adapter
+  // Register file management with our custom GitHub adapter
   osjs.register(VFSServiceProvider, {
     args: {
       adapters: {
