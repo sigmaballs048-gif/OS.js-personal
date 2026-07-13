@@ -57,28 +57,52 @@ import githubAdapter from './github-vfs.js';
 const init = () => {
   const osjs = new Core({
     standalone: true,
-    // Provide explicit metadata configurations to completely bypass standalone network fetch errors
+    
+    // 1. Supply metadata objects for all system layout packages 
     packages: {
       metadata: [
         {
           name: 'StandardTheme',
           type: 'theme',
           category: 'system',
-          title: { en_EN: 'Standard Theme' },
-          description: { en_EN: 'Standard Theme' }
+          title: { en_EN: 'Standard Theme' }
+        },
+        {
+          name: 'GnomeIcons',
+          type: 'icons',
+          category: 'system',
+          title: { en_EN: 'Gnome Icons' }
+        },
+        {
+          name: 'FreedesktopSounds',
+          type: 'sounds',
+          category: 'system',
+          title: { en_EN: 'Freedesktop Sounds' }
         }
       ]
+    },
+
+    // 2. Override default configurations to use a live external wallpaper asset
+    config: {
+      desktop: {
+        settings: {
+          background: {
+            type: 'image',
+            src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920'
+          }
+        }
+      }
     }
   });
 
-  // 1. Register configurations before UI rendering starts
+  // Register settings layer
   osjs.register(SettingsServiceProvider, { before: true });
   
-  // 2. Load core UI layer engines
+  // Register basic UI layer services
   osjs.register(CoreServiceProvider);
   osjs.register(DesktopServiceProvider);
   
-  // 3. Register filesystem and attach your customized github storage module
+  // Register file management and inject the custom GitHub adapter
   osjs.register(VFSServiceProvider, {
     args: {
       adapters: {
@@ -87,11 +111,11 @@ const init = () => {
     }
   });
 
-  // 4. Load background communication services
+  // Register background system utilities
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // 5. Fire up the desktop interface
+  // Boot the web desktop interface
   osjs.boot();
 };
 
