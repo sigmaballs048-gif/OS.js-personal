@@ -40,8 +40,8 @@
 
 // src/client/index.js
 
-import { Core } from '@os-js/client';
-import { CoreServiceProvider } from '@os-js/client';
+import { Core } from '@osjs/client';
+import { CoreServiceProvider } from '@osjs/client';
 import githubAdapter from './github-vfs.js';
 
 const init = () => {
