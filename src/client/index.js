@@ -53,12 +53,15 @@ import {
   AuthServiceProvider
 } from '@osjs/client';
 import githubAdapter from './github-vfs.js';
+import config from './config.js'; // Crucial: Imports the default OS.js core settings
 
 const init = () => {
+  // Safely merge the default configuration with our standalone overrides
   const osjs = new Core({
+    ...config,
     standalone: true,
     
-    // 1. Supply metadata objects for all system layout packages 
+    // Explicitly seed the metadata definitions to prevent outbound HTTP requests
     packages: {
       metadata: [
         {
@@ -82,18 +85,18 @@ const init = () => {
       ]
     },
 
-    // 2. Override default configurations to use a live external wallpaper asset
-    config: {
-      desktop: {
-        settings: {
-          background: {
-            type: 'image',
-            src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920'
-          }
+    // Point the desktop background directly to an external URL to bypass the 404
+    desktop: {
+      ...(config.desktop || {}),
+      settings: {
+        ...(config.desktop?.settings || {}),
+        background: {
+          type: 'image',
+          src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920'
         }
       }
     }
-  });
+  }, {});
 
   // Register settings layer
   osjs.register(SettingsServiceProvider, { before: true });
