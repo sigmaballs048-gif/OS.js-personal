@@ -54,8 +54,6 @@ import {
 } from '@osjs/client';
 import githubAdapter from './github-vfs.js';
 import config from './config.js';
-
-// Dynamically import the full compiled manifest generated during the build process
 import metadata from '../../dist/metadata.json';
 
 const init = () => {
@@ -63,12 +61,20 @@ const init = () => {
     ...config,
     standalone: true,
     
-    // Inject the entire structural manifest to completely eliminate discovery requests
+    // Completely stub the package registry methods to guarantee no HTTP hits
     packages: {
-      metadata
+      metadata,
+      registry: {
+        launch: (name) => Promise.resolve(true),
+        preload: (pkg) => Promise.resolve([]),
+        get: () => [],
+        entries: () => []
+      },
+      // Short-circuit the user package discovery layer
+      discover: () => Promise.resolve([]),
+      configure: () => ({})
     },
 
-    // Configure a reliable external fallback image for the desktop background
     desktop: {
       ...(config.desktop || {}),
       settings: {
@@ -81,31 +87,31 @@ const init = () => {
     }
   }, {});
 
-  // Force the settings provider into localStorage mode to stop background server syncs
+  // Force local environment settings to prevent server sync actions
   osjs.register(SettingsServiceProvider, {
     before: true,
     args: { adapter: 'localStorage' }
   });
   
-  // Register core UI layer services
+  // Register necessary desktop components
   osjs.register(CoreServiceProvider);
   osjs.register(DesktopServiceProvider);
   
-  // Register file management with our custom GitHub adapter
   osjs.register(VFSServiceProvider, {
-    args: {
-      adapters: {
-        github: githubAdapter
-      }
-    }
+    args: { adapters: { github: githubAdapter } }
   });
 
-  // Register background system utilities
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // Boot the web desktop interface
-  osjs.boot();
+  // Boot up the client layout
+  osjs.boot()
+    .then(() => {
+      console.log('Core booted. Launching workspace panels...');
+      // Manually initiate panels
+      return osjs.run('@osjs/panels');
+    })
+    .catch((err) => console.error('System failed to initialize desktop:', err));
 };
 
 window.addEventListener('DOMContentLoaded', () => init());
