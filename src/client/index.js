@@ -1,48 +1,3 @@
-/*!
- * OS.js - JavaScript Cloud/Web Desktop Platform
- *
- * Copyright (c) 2011-2020, Anders Evenrud <andersevenrud@gmail.com>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * @author  Anders Evenrud <andersevenrud@gmail.com>
- * @licence Simplified BSD License
- */
-
-//
-// This is the client bootstrapping script.
-// This is where you can register service providers or set up
-// your libraries etc.
-//
-// https://manual.os-js.org/guide/provider/
-// https://manual.os-js.org/install/
-// https://manual.os-js.org/resource/official/
-//
-
-// src/client/index.js
-// src/client/index.js
-
-// src/client/index.js
-
 import {
   Core,
   CoreServiceProvider,
@@ -54,12 +9,21 @@ import {
 } from '@osjs/client';
 import githubAdapter from './github-vfs.js';
 import config from './config.js';
-import metadata from '../../dist/metadata.json';
+
+// Import the compiled package data directly
+import metadata from '../../dist/metadata.json'; 
 
 const init = () => {
   const osjs = new Core({
     ...config,
-    standalone: true,
+    standalone: true, // Strictly enforces client-side only mode
+    
+    // Inject the raw metadata object to prevent OS.js from attempting an HTTP fetch
+    packages: {
+      ...(config.packages || {}),
+      manifest: metadata 
+    },
+
     desktop: {
       ...(config.desktop || {}),
       settings: {
@@ -72,39 +36,14 @@ const init = () => {
     }
   }, {});
 
-  // Force local environment storage settings
+  // Force local environment settings to prevent server sync
   osjs.register(SettingsServiceProvider, {
     before: true,
     args: { adapter: 'localStorage' }
   });
   
-  // Register core system services
+  // Register all core providers normally
   osjs.register(CoreServiceProvider);
-  
-  // INTERCEPT & PATCH THE PACKAGE REGISTRY
-  // This completely silences the standalone network error and populates the registry safely
-  const packageService = osjs.make('osjs/packages');
-  if (packageService) {
-    packageService.init = async function() {
-      console.log('System Standalone Mode: Injecting local metadata registry...');
-      
-      const packagesArray = Array.isArray(metadata) 
-        ? metadata 
-        : Object.values(metadata || {});
-
-      packagesArray.forEach(pkg => {
-        try {
-          this.register(pkg);
-        } catch (e) {
-          console.warn('Skipping package registration error:', pkg?.name, e);
-        }
-      });
-      
-      return true;
-    };
-  }
-
-  // Register remaining application and layout services
   osjs.register(DesktopServiceProvider);
   
   osjs.register(VFSServiceProvider, {
@@ -114,10 +53,10 @@ const init = () => {
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // Boot up the environment and execute the desktop layout safely
+  // Boot the OS and launch the panel layout
   osjs.boot()
     .then(() => {
-      console.log('System successfully booted. Triggering panels...');
+      console.log('Core initialized natively. Launching workspace panels...');
       return osjs.run('@osjs/panels');
     })
     .catch((err) => console.error('System failed to initialize desktop:', err));
