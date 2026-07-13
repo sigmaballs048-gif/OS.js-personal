@@ -41,8 +41,10 @@
 // src/client/index.js
 // src/client/index.js
 
+// src/client/index.js
+
 import { Core } from '@osjs/client';
-import { CoreServiceProvider } from '@osjs/client';
+import { CoreServiceProvider, SettingsServiceProvider } from '@osjs/client';
 import githubAdapter from './github-vfs.js';
 
 const init = () => {
@@ -50,16 +52,17 @@ const init = () => {
     standalone: true
   });
 
-  // Register Core services
-  osjs.register(CoreServiceProvider, {
-    before: (core) => {
-      // Register our filesystem adapter inside the core registry
-      core.register('osjs/fs', (fs) => ({
-        adapters: {
-          github: githubAdapter(core)
-        }
-      }));
-    }
+  // Register Core services and Settings storage
+  osjs.register(CoreServiceProvider);
+  osjs.register(SettingsServiceProvider, { instantiate: true });
+
+  // Hook into the configuration filesystem registry before booting
+  osjs.on('init', () => {
+    osjs.register('osjs/fs', (fs) => ({
+      adapters: {
+        github: githubAdapter(osjs)
+      }
+    }));
   });
 
   // Boot up the desktop environment
