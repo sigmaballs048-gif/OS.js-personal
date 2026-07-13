@@ -11,28 +11,33 @@ import githubAdapter from './github-vfs.js';
 import config from './config.js';
 
 const init = async () => {
-  // 1. Fetch the manifest natively to completely bypass OS.js internal HTTP blockers
   let packageManifest = [];
+
   try {
     console.log('Fetching system metadata manually...');
     const response = await fetch('metadata.json');
     const data = await response.json();
     
-    // Ensure the manifest is cleanly formatted as an array for OS.js
+    // OS.js package service expects an array of metadata objects.
+    // If your build output targets a dictionary mapping, convert it here.
     packageManifest = Array.isArray(data) ? data : Object.values(data);
-    console.log(`Successfully loaded ${packageManifest.length} packages from server.`);
+    console.log(`Loaded metadata containing ${packageManifest.length} entries.`);
   } catch (error) {
-    console.error('Failed to fetch metadata.json manually:', error);
+    console.error('Failed to pre-load system manifest metadata:', error);
   }
 
-  // 2. Initialize Core with the pre-fetched manifest array
   const osjs = new Core({
     ...config,
-    standalone: true, // Strictly enforces client-side mode
+    standalone: true, // Blocks external request chains
+    
+    // Explicitly configure the core package system to use the local list natively
     packages: {
       ...(config.packages || {}),
-      manifest: packageManifest // Inject the raw data we just fetched
+      manifest: packageManifest,
+      registry: packageManifest, // Duplicate target to satisfy internal package registry fallbacks
+      discover: () => Promise.resolve(packageManifest) // Overrides background discovery checks
     },
+
     desktop: {
       ...(config.desktop || {}),
       settings: {
@@ -45,13 +50,13 @@ const init = async () => {
     }
   }, {});
 
-  // Force local environment storage settings
+  // Force local storage environments to disable user backend syncs
   osjs.register(SettingsServiceProvider, {
     before: true,
     args: { adapter: 'localStorage' }
   });
   
-  // Register all core providers normally
+  // Register necessary systems
   osjs.register(CoreServiceProvider);
   osjs.register(DesktopServiceProvider);
   
@@ -62,7 +67,7 @@ const init = async () => {
   osjs.register(NotificationServiceProvider);
   osjs.register(AuthServiceProvider);
 
-  // Boot the OS and launch the panel layout
+  // Boot OS.js and explicitly invoke the layout panel
   osjs.boot()
     .then(() => {
       console.log('OS.js Native Boot Complete. Launching panels...');
@@ -71,5 +76,4 @@ const init = async () => {
     .catch((err) => console.error('Desktop initialization failed:', err));
 };
 
-// Wait for the DOM, then run our async initialization
 window.addEventListener('DOMContentLoaded', () => init());
