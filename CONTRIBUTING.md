@@ -7,7 +7,7 @@ If you want to contribute, but not sure what to do, here's a list of things that
 * Finding security problems
 * Themes and general graphics
 * Website design (like the homepage and manuals)
-* Documentation
+* Documentation S
 
 If you need help, or just up for some general discussion, head into the [community forums](https://community.os-js.org/) or [community chat](https://gitter.im/os-js/OS.js).
 
