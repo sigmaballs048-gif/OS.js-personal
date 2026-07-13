@@ -43,8 +43,15 @@
 
 // src/client/index.js
 
-import { Core } from '@osjs/client';
-import { CoreServiceProvider, SettingsServiceProvider } from '@osjs/client';
+import {
+  Core,
+  CoreServiceProvider,
+  DesktopServiceProvider,
+  VFSServiceProvider,
+  NotificationServiceProvider,
+  SettingsServiceProvider,
+  AuthServiceProvider
+} from '@osjs/client';
 import githubAdapter from './github-vfs.js';
 
 const init = () => {
@@ -52,20 +59,27 @@ const init = () => {
     standalone: true
   });
 
-  // Register Core services and Settings storage
+  // 1. Register settings configuration before core launches
+  osjs.register(SettingsServiceProvider, { before: true });
+  
+  // 2. Register core UI layer frameworks
   osjs.register(CoreServiceProvider);
-  osjs.register(SettingsServiceProvider, { instantiate: true });
-
-  // Hook into the configuration filesystem registry before booting
-  osjs.on('init', () => {
-    osjs.register('osjs/fs', (fs) => ({
+  osjs.register(DesktopServiceProvider);
+  
+  // 3. Register Virtual File System and cleanly bind the github adapter
+  osjs.register(VFSServiceProvider, {
+    args: {
       adapters: {
-        github: githubAdapter(osjs)
+        github: githubAdapter
       }
-    }));
+    }
   });
 
-  // Boot up the desktop environment
+  // 4. Register supporting background handlers
+  osjs.register(NotificationServiceProvider);
+  osjs.register(AuthServiceProvider);
+
+  // 5. Fire up the layout engine
   osjs.boot();
 };
 
